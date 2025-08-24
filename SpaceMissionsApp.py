@@ -8,175 +8,184 @@ import streamlit.components.v1 as components
 
 # --- Custom Component for Birthday Input ---
 # This HTML and JavaScript will render the custom date input fields and handle their styling
+# IMPORTANT: Wrapped the content in a full HTML document structure
 _COMPONENT_HTML = """
-<script src="https://unpkg.com/streamlit-component-lib@1.0.0/dist/streamlit-component-lib.js"></script>
-<style>
-    /* Styling for the overall container of the custom date inputs */
-    .date-input-container-wrapper {
-        display: flex;
-        flex-direction: column; /* Stack year, month, day vertically in their own lines */
-        gap: 10px; /* Space between each input row */
-        margin-bottom: 10px;
-    }
-    /* Styling for each individual date input row (label + input) */
-    .date-input-row {
-        display: flex;
-        align-items: center;
-        gap: 10px; /* Space between label and input */
-    }
-    .date-input-row label {
-        color: white;
-        font-weight: bold;
-        min-width: 60px; /* Ensure labels align */
-        text-align: right;
-    }
-    .date-input-row input[type="number"] {
-        flex-grow: 1; /* Allow input to take available space */
-        max-width: 120px; /* Limit max width for a cleaner look */
-        padding: 8px;
-        border-radius: 5px;
-        border: 1px solid #ccc;
-        background-color: black; /* Dark theme */
-        color: white; /* White text */
-        font-size: 1em;
-        transition: border-color 0.3s ease, color 0.3s ease, background-color 0.3s ease;
-        -moz-appearance: textfield; /* Hide Firefox number input arrows */
-    }
-    /* Hide Chrome/Safari number input arrows */
-    .date-input-row input[type="number"]::-webkit-outer-spin-button,
-    .date-input-row input[type="number"]::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
-    .date-input-row input[type="number"]:focus {
-        outline: none;
-        border-color: #4CAF50;
-    }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Birthday Input Component</title>
+    <script src="https://unpkg.com/streamlit-component-lib@1.0.0/dist/streamlit-component-lib.js"></script>
+    <style>
+        /* Styling for the overall container of the custom date inputs */
+        .date-input-container-wrapper {
+            display: flex;
+            flex-direction: column; /* Stack year, month, day vertically in their own lines */
+            gap: 10px; /* Space between each input row */
+            margin-bottom: 10px;
+        }
+        /* Styling for each individual date input row (label + input) */
+        .date-input-row {
+            display: flex;
+            align-items: center;
+            gap: 10px; /* Space between label and input */
+        }
+        .date-input-row label {
+            color: white;
+            font-weight: bold;
+            min-width: 60px; /* Ensure labels align */
+            text-align: right;
+        }
+        .date-input-row input[type="number"] {
+            flex-grow: 1; /* Allow input to take available space */
+            max-width: 120px; /* Limit max width for a cleaner look */
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            background-color: black; /* Dark theme */
+            color: white; /* White text */
+            font-size: 1em;
+            transition: border-color 0.3s ease, color 0.3s ease, background-color 0.3s ease;
+            -moz-appearance: textfield; /* Hide Firefox number input arrows */
+        }
+        /* Hide Chrome/Safari number input arrows */
+        .date-input-row input[type="number"]::-webkit-outer-spin-button,
+        .date-input-row input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .date-input-row input[type="number"]:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
 
-    /* Styles for when no missions are found (faded state) */
-    .date-input-container-wrapper.faded .date-input-row input[type="number"],
-    .date-input-container-wrapper.faded .date-input-row label {
-        color: #888 !important;
-        background-color: #333 !important;
-        border-color: #555 !important;
-    }
-    .date-input-container-wrapper.faded .date-input-row input[type="number"]:focus {
-        border-color: #888;
-    }
-    /* Styles for when missions are found (normal state) */
-    .date-input-container-wrapper.normal .date-input-row input[type="number"],
-    .date-input-container-wrapper.normal .date-input-row label {
-        color: white !important;
-        background-color: black !important;
-        border-color: white !important;
-    }
-</style>
-<div id="birthday-input-root" class="date-input-container-wrapper">
-    <div class="date-input-row">
-        <label for="year-input">Year:</label>
-        <input type="number" id="year-input" min="1900" max="{max_year}" value="{initial_year}">
+        /* Styles for when no missions are found (faded state) */
+        .date-input-container-wrapper.faded .date-input-row input[type="number"],
+        .date-input-container-wrapper.faded .date-input-row label {
+            color: #888 !important;
+            background-color: #333 !important;
+            border-color: #555 !important;
+        }
+        .date-input-container-wrapper.faded .date-input-row input[type="number"]:focus {
+            border-color: #888;
+        }
+        /* Styles for when missions are found (normal state) */
+        .date-input-container-wrapper.normal .date-input-row input[type="number"],
+        .date-input-container-wrapper.normal .date-input-row label {
+            color: white !important;
+            background-color: black !important;
+            border-color: white !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="birthday-input-root" class="date-input-container-wrapper">
+        <div class="date-input-row">
+            <label for="year-input">Year:</label>
+            <input type="number" id="year-input" min="1900" max="{max_year}" value="{initial_year}">
+        </div>
+        <div class="date-input-row">
+            <label for="month-input">Month:</label>
+            <input type="number" id="month-input" min="1" max="12" value="{initial_month}">
+        </div>
+        <div class="date-input-row">
+            <label for="day-input">Day:</label>
+            <input type="number" id="day-input" min="1" max="31" value="{initial_day}">
+        </div>
     </div>
-    <div class="date-input-row">
-        <label for="month-input">Month:</label>
-        <input type="number" id="month-input" min="1" max="12" value="{initial_month}">
-    </div>
-    <div class="date-input-row">
-        <label for="day-input">Day:</label>
-        <input type="number" id="day-input" min="1" max="31" value="{initial_day}">
-    </div>
-</div>
-<script>
-    const Streamlit = window.Streamlit;
-    const root = document.getElementById("birthday-input-root");
-    const yearInput = root.querySelector("#year-input");
-    const monthInput = root.querySelector("#month-input");
-    const dayInput = root.querySelector("#day-input");
+    <script>
+        const Streamlit = window.Streamlit;
+        const root = document.getElementById("birthday-input-root");
+        const yearInput = root.querySelector("#year-input");
+        const monthInput = root.querySelector("#month-input");
+        const dayInput = root.querySelector("#day-input");
 
-    // Helper to format date string
-    function formatDate(year, month, day) {
-        return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    }
+        // Helper to format date string
+        function formatDate(year, month, day) {
+            return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
 
-    // Function to send updated date and validity to Streamlit
-    function sendDateToStreamlit() {
-        const year = parseInt(yearInput.value);
-        const month = parseInt(monthInput.value);
-        const day = parseInt(dayInput.value);
+        // Function to send updated date and validity to Streamlit
+        function sendDateToStreamlit() {
+            const year = parseInt(yearInput.value);
+            const month = parseInt(monthInput.value);
+            const day = parseInt(dayInput.value);
 
-        let isValid = true;
-        let dateString = null;
+            let isValid = true;
+            let dateString = null;
 
-        try {
-            // Check for valid day of month (e.g., no Feb 30th)
-            const testDate = new Date(year, month - 1, day);
-            if (testDate.getFullYear() !== year || testDate.getMonth() !== month - 1 || testDate.getDate() !== day) {
+            try {
+                // Basic check for number inputs not being empty or NaN
+                if (isNaN(year) || isNaN(month) || isNaN(day) || yearInput.value.trim().length === 0 || monthInput.value.trim().length === 0 || dayInput.value.trim().length === 0) {
+                    isValid = false;
+                } else {
+                    // Check for valid day of month (e.g., no Feb 30th)
+                    const testDate = new Date(year, month - 1, day);
+                    if (testDate.getFullYear() !== year || testDate.getMonth() !== month - 1 || testDate.getDate() !== day) {
+                        isValid = false;
+                    } else {
+                        dateString = formatDate(year, month, day);
+                    }
+                }
+            } catch (e) {
                 isValid = false;
-            } else {
-                 dateString = formatDate(year, month, day);
             }
-        } catch (e) {
-            isValid = false;
+
+            Streamlit.setComponentValue({
+                year: year,
+                month: month,
+                day: day,
+                date_str: dateString, // Send null if invalid
+                is_valid: isValid
+            });
+            Streamlit.setFrameHeight(); // Ensure iframe height is adjusted after sending value
         }
 
-        // Also check if year, month, day inputs are empty or clearly invalid numbers
-        if (isNaN(year) || isNaN(month) || isNaN(day) || yearInput.value.length === 0 || monthInput.value.length === 0 || dayInput.value.length === 0) {
-            isValid = false;
-            dateString = null; // No valid date string if inputs are incomplete/invalid
+        // Function to update the component's UI based on arguments from Streamlit
+        function updateComponent(args) {
+            const { initial_year, initial_month, initial_day, max_year, has_missions_for_birthday_status } = args;
+
+            // Update input values if they are different from what's currently displayed
+            if (parseInt(yearInput.value) !== initial_year) yearInput.value = initial_year;
+            if (parseInt(monthInput.value) !== initial_month) monthInput.value = initial_month;
+            if (parseInt(dayInput.value) !== initial_day) dayInput.value = initial_day;
+            
+            yearInput.max = max_year;
+
+            // Apply styling based on mission status
+            if (has_missions_for_birthday_status === true) {
+                root.classList.remove('faded');
+                root.classList.add('normal');
+            } else if (has_missions_for_birthday_status === false) {
+                root.classList.remove('normal');
+                root.classList.add('faded');
+            } else {
+                // Neutral state if status is None (e.g., on initial load or invalid date)
+                root.classList.remove('faded');
+                root.classList.remove('normal');
+            }
+
+            Streamlit.setFrameHeight(); // Adjust iframe height to fit content
         }
 
-        Streamlit.setComponentValue({
-            year: year,
-            month: month,
-            day: day,
-            date_str: dateString, // Send null if invalid
-            is_valid: isValid
-        });
-    }
+        // Add event listeners to input fields
+        yearInput.addEventListener('input', sendDateToStreamlit);
+        monthInput.addEventListener('input', sendDateToStreamlit);
+        dayInput.addEventListener('input', sendDateToStreamlit);
 
-    // Function to update the component's UI based on arguments from Streamlit
-    function updateComponent(args) {
-        const { initial_year, initial_month, initial_day, max_year, has_missions_for_birthday_status } = args;
+        // Register event listener for Streamlit component updates
+        Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, updateComponent);
 
-        // Update input values if they are different from what's currently displayed
-        // This ensures Streamlit can "reset" or sync the component if needed
-        if (parseInt(yearInput.value) !== initial_year) yearInput.value = initial_year;
-        if (parseInt(monthInput.value) !== initial_month) monthInput.value = initial_month;
-        if (parseInt(dayInput.value) !== initial_day) dayInput.value = initial_day;
-        
-        yearInput.max = max_year;
-
-        // Apply styling based on mission status
-        if (has_missions_for_birthday_status === true) {
-            root.classList.remove('faded');
-            root.classList.add('normal');
-        } else if (has_missions_for_birthday_status === false) {
-            root.classList.remove('normal');
-            root.classList.add('faded');
-        } else {
-            // Neutral state if status is None (e.g., on initial load or invalid date)
-            root.classList.remove('faded');
-            root.classList.remove('normal');
-        }
-
-        Streamlit.setFrameHeight(); // Adjust iframe height to fit content
-    }
-
-    // Add event listeners to input fields
-    yearInput.addEventListener('input', sendDateToStreamlit);
-    monthInput.addEventListener('input', sendDateToStreamlit);
-    dayInput.addEventListener('input', sendDateToStreamlit);
-
-    // Register event listener for Streamlit component updates
-    Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, updateComponent);
-
-    // Initial call to updateComponent and send initial state to Streamlit
-    updateComponent(Streamlit.args);
-    sendDateToStreamlit(); // Send initial values to Python
-</script>
+        // Initial call to updateComponent and send initial state to Streamlit
+        updateComponent(Streamlit.args);
+        sendDateToStreamlit(); // Send initial values to Python
+    </script>
+</body>
+</html>
 """
 
 # Create a Streamlit component function
-# The `html` argument directly embeds the HTML/JS.
 _my_birthday_input = components.declare_component(
     "my_birthday_input",
     html=_COMPONENT_HTML,
@@ -190,7 +199,6 @@ def birthday_input_component(initial_year=2000, initial_month=1, initial_day=1, 
     and sends changes back to Streamlit. It also visually updates based on
     `has_missions_for_birthday_status` passed from Streamlit.
     """
-    # Streamlit passes arguments to the JavaScript component and receives its return value.
     return _my_birthday_input(
         initial_year=initial_year,
         initial_month=initial_month,
@@ -203,7 +211,7 @@ def birthday_input_component(initial_year=2000, initial_month=1, initial_day=1, 
             "year": initial_year,
             "month": initial_month,
             "day": initial_day,
-            "date_str": f"{initial_year:04d}-{initial_month:02d}-{initial_day:02d}",
+            "date_str": f"{initial_year:04d}-{initial_month:02d}-{initial_day:02d}", # Provide a default valid string
             "is_valid": True
         }
     )
@@ -325,7 +333,6 @@ if bday_is_valid_from_component:
         st.session_state.selected_date_str = bday_date_str_from_component
 
         # Filter missions data
-        # Ensure 'sp' has 'Year', 'Month', 'Day' columns and they are correctly typed
         filtered_missions = sp[(sp['Year'] == year_bday) & (sp['Month'] == month_bday) & (sp['Day'] == day_bday)]
         st.session_state.missions_data = filtered_missions
         st.session_state.has_missions_for_birthday = not filtered_missions.empty
@@ -463,6 +470,6 @@ if st.session_state.nasa_search_submitted:
     st.subheader(f"NASA Image for {st.session_state.separate_nasa_date_str}")
     if "url" in st.session_state.separate_nasa_image_data:
         st.image(st.session_state.separate_nasa_image_data["url"], caption=st.session_state.separate_nasa_image_data.get("title", "NASA APOD Image"))
-        st.write(st.session_state.separate_nasa_image_data.get("explanation", ""))
+        st.write(st.session_state.separate_image_data.get("explanation", ""))
     else:
         st.warning(f"⚠️ No NASA APOD image available for {st.session_state.separate_nasa_date_str}.")
