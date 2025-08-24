@@ -4,6 +4,7 @@ import requests
 import folium
 from streamlit_folium import st_folium
 import datetime
+import wikipediaapi # Import the new library
 
 # Ensure the app uses the wide layout
 st.set_page_config(layout="wide")
@@ -88,8 +89,6 @@ if 'submitted' not in st.session_state:
     st.session_state.submitted = False
 if 'missions_data' not in st.session_state:
     st.session_state.missions_data = pd.DataFrame()
-if 'nasa_image_data' not in st.session_state:
-    st.session_state.nasa_image_data = {}
 if 'selected_date_str' not in st.session_state:
     st.session_state.selected_date_str = ""
 if 'has_missions_for_birthday' not in st.session_state:
@@ -108,19 +107,36 @@ if 'separate_nasa_date_str' not in st.session_state:
 url='https://raw.githubusercontent.com/olaa9199-cloud/SpaceMissionApp/refs/heads/main/dataset_from_space.CSV'
 sp=pd.read_csv(url)
 
-# Convert the 'Date' column to datetime and then to string for the selectbox
-# Also, handle potential errors
-sp['Date'] = pd.to_datetime(sp['Date'], errors='coerce').dt.strftime('%Y-%m-%d')
-# Get a list of unique, sorted dates to display in the dropdown
-available_dates = sorted(sp['Date'].dropna().unique().tolist())
+# Convert the 'Date' column to datetime
+sp['Date'] = pd.to_datetime(sp['Date'], errors='coerce')
 
-# --- Birthday input section ---
+# --- Wikipedia API Setup ---
+wiki_wiki = wikipediaapi.Wikipedia(
+    language='en',
+    user_agent="SpaceMissionsApp/0.1 (contact: olaa9199@gmail.com)"
+)
+
+def get_mission_summary(mission_name, max_chars=500):
+    page = wiki_wiki.page(mission_name)
+    if not page.exists():
+        return "No summary found."
+    
+    summary = page.summary
+    if len(summary) <= max_chars:
+        return summary
+    
+    cut = summary[:max_chars].rsplit('.', 1)[0] + '.'
+    return cut
+
+# --- Mission Date input section ---
 st.subheader("Enter The Date Of The Mission")
 
-# Use a selectbox to show only dates from the dataset
-selected_date_str = st.selectbox(
-    "Select a Date from the Missions Dataset:",
-    options=available_dates,
+# Use st.date_input for a calendar interface
+selected_date = st.date_input(
+    "Select a Date:",
+    datetime.date(2000, 1, 1),
+    min_value=datetime.date(1900, 1, 1),
+    max_value=datetime.datetime.now().date(),
     key="mission_date_select"
 )
 
@@ -132,19 +148,19 @@ if st.session_state.has_missions_for_birthday is not None and st.session_state.s
         st.markdown(f'<span class="date-status-not-found">😔 No missions on {st.session_state.selected_date_str}.</span>', unsafe_allow_html=True)
 
 
-# Submit button logic for birthday
-if st.button("Submit Mission Date", key="submit_birthday_button"):
+# Submit button logic for mission search
+if st.button("Submit Mission Date", key="submit_mission_button"):
     st.session_state.submitted = True
     
-    st.session_state.selected_date_str = selected_date_str
+    st.session_state.selected_date_str = selected_date.strftime('%Y-%m-%d')
 
-    # Filter missions data using the full date string
-    filtered_missions = sp[sp['Date'] == selected_date_str]
+    # Filter missions data using the selected date object
+    filtered_missions = sp[sp['Date'].dt.date == selected_date]
     st.session_state.missions_data = filtered_missions
     st.session_state.has_missions_for_birthday = not filtered_missions.empty
 
 
-# Display Birthday Results (Missions and NASA Image on Birthday) IF submitted
+# Display Mission Results and Map IF submitted
 if st.session_state.submitted:
     st.markdown("---")
 
@@ -163,6 +179,7 @@ if st.session_state.submitted:
                 st.markdown("---")
         else:
             st.warning("⚠️ No mission found on this date.")
+
 
     with col2:
         st.subheader("🗺️ Launch Locations")
@@ -196,6 +213,13 @@ if st.session_state.submitted:
                 st.info("No valid mission location data for this date to display on the map.")
         else:
             st.info("No location data available for this date.")
+        
+        # --- Add the summary here ---
+        if not st.session_state.missions_data.empty:
+            first_mission_name = st.session_state.missions_data.iloc[0]['Mission']
+            st.subheader(f"📜 Summary for {first_mission_name}")
+            summary_text = get_mission_summary(first_mission_name)
+            st.write(summary_text)
 
 st.markdown("---")
 
