@@ -7,8 +7,6 @@ import datetime
 import streamlit.components.v1 as components
 
 # --- Custom Component for Birthday Input ---
-# This HTML and JavaScript will render the custom date input fields and handle their styling
-# IMPORTANT: Wrapped the content in a full HTML document structure
 _COMPONENT_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -16,8 +14,17 @@ _COMPONENT_HTML = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Birthday Input Component</title>
+    <!-- It's crucial that streamlit-component-lib.js is loaded correctly and early -->
     <script src="https://unpkg.com/streamlit-component-lib@1.0.0/dist/streamlit-component-lib.js"></script>
     <style>
+        /* Base styling for the entire body of the component iframe */
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: black; /* Ensure component background matches app */
+            color: white; /* Default text color */
+        }
         /* Styling for the overall container of the custom date inputs */
         .date-input-container-wrapper {
             display: flex;
@@ -32,7 +39,7 @@ _COMPONENT_HTML = """
             gap: 10px; /* Space between label and input */
         }
         .date-input-row label {
-            color: white;
+            color: white; /* Default label color */
             font-weight: bold;
             min-width: 60px; /* Ensure labels align */
             text-align: right;
@@ -95,11 +102,14 @@ _COMPONENT_HTML = """
         </div>
     </div>
     <script>
-        const Streamlit = window.Streamlit;
-        const root = document.getElementById("birthday-input-root");
-        const yearInput = root.querySelector("#year-input");
-        const monthInput = root.querySelector("#month-input");
-        const dayInput = root.querySelector("#day-input");
+        // Ensure Streamlit object is available. It's usually globally available
+        // after streamlit-component-lib.js loads.
+        let Streamlit; // Declare Streamlit globally within the script context
+        let root;
+        let yearInput;
+        let monthInput;
+        let dayInput;
+        let componentReadySent = false; // Flag to ensure setComponentReady is called once
 
         // Helper to format date string
         function formatDate(year, month, day) {
@@ -108,6 +118,11 @@ _COMPONENT_HTML = """
 
         // Function to send updated date and validity to Streamlit
         function sendDateToStreamlit() {
+            if (!Streamlit) {
+                console.error("Streamlit object not available when trying to send date.");
+                return;
+            }
+
             const year = parseInt(yearInput.value);
             const month = parseInt(monthInput.value);
             const day = parseInt(dayInput.value);
@@ -130,6 +145,7 @@ _COMPONENT_HTML = """
                 }
             } catch (e) {
                 isValid = false;
+                console.error("Date parsing error in component:", e);
             }
 
             Streamlit.setComponentValue({
@@ -143,14 +159,21 @@ _COMPONENT_HTML = """
         }
 
         // Function to update the component's UI based on arguments from Streamlit
-        function updateComponent(args) {
+        function updateComponentUI(args) {
+            if (!root || !yearInput || !monthInput || !dayInput) {
+                console.warn("DOM elements not ready for UI update.");
+                return; // Guard against elements not being ready
+            }
+
             const { initial_year, initial_month, initial_day, max_year, has_missions_for_birthday_status } = args;
 
             // Update input values if they are different from what's currently displayed
+            // This ensures Streamlit can "reset" or sync the component if needed
             if (parseInt(yearInput.value) !== initial_year) yearInput.value = initial_year;
             if (parseInt(monthInput.value) !== initial_month) monthInput.value = initial_month;
             if (parseInt(dayInput.value) !== initial_day) dayInput.value = initial_day;
             
+            // Set max year, important for input validation in browser
             yearInput.max = max_year;
 
             // Apply styling based on mission status
@@ -166,20 +189,65 @@ _COMPONENT_HTML = """
                 root.classList.remove('normal');
             }
 
-            Streamlit.setFrameHeight(); // Adjust iframe height to fit content
+            if (Streamlit) {
+                Streamlit.setFrameHeight(); // Adjust iframe height to fit content
+            }
         }
 
-        // Add event listeners to input fields
-        yearInput.addEventListener('input', sendDateToStreamlit);
-        monthInput.addEventListener('input', sendDateToStreamlit);
-        dayInput.addEventListener('input', sendDateToStreamlit);
+        // This function will be called by Streamlit when it wants to render/rerun the component
+        function renderStreamlitComponent(event) {
+            Streamlit = window.Streamlit; // Ensure we always have the latest Streamlit object
 
-        // Register event listener for Streamlit component updates
-        Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, updateComponent);
+            if (!Streamlit) {
+                console.error("Streamlit object not available during renderStreamlitComponent.");
+                return;
+            }
 
-        // Initial call to updateComponent and send initial state to Streamlit
-        updateComponent(Streamlit.args);
-        sendDateToStreamlit(); // Send initial values to Python
+            // Get arguments from Python
+            const args = event.detail ? event.detail.args : Streamlit.args; // For first render, Streamlit.args is used
+
+            // Initialize DOM elements and event listeners only once
+            if (!root) { 
+                root = document.getElementById("birthday-input-root");
+                yearInput = root.querySelector("#year-input");
+                monthInput = root.querySelector("#month-input");
+                dayInput = root.querySelector("#day-input");
+
+                yearInput.addEventListener('input', sendDateToStreamlit);
+                monthInput.addEventListener('input', sendDateToStreamlit);
+                dayInput.addEventListener('input', sendDateToStreamlit);
+            }
+
+            updateComponentUI(args); // Update UI based on Python arguments
+            sendDateToStreamlit(); // Send current input values back to Python
+            Streamlit.setFrameHeight(); // Adjust frame height
+
+            // Signal readiness only after the first render cycle
+            // This is a common pattern to avoid "TypeError" before component is fully set up
+            if (!componentReadySent) {
+                Streamlit.setComponentReady();
+                componentReadySent = true;
+            }
+        }
+
+        // Main entry point for the component. Listen for Streamlit's render event.
+        // This is generally more reliable than window.onload or DOMContentLoaded for components.
+        // Check if Streamlit is already available (e.g., if script loads after SCL)
+        if (window.Streamlit) {
+            Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, renderStreamlitComponent);
+            // Manually trigger render for the initial load if Streamlit is already there
+            renderStreamlitComponent({ detail: { args: Streamlit.args } });
+        } else {
+            // Fallback if Streamlit is not immediately available, wait for window load
+            window.addEventListener('load', () => {
+                if (window.Streamlit) {
+                    Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, renderStreamlitComponent);
+                    renderStreamlitComponent({ detail: { args: Streamlit.args } });
+                } else {
+                    console.error("Streamlit object not available even after window load.");
+                }
+            });
+        }
     </script>
 </body>
 </html>
@@ -199,6 +267,8 @@ def birthday_input_component(initial_year=2000, initial_month=1, initial_day=1, 
     and sends changes back to Streamlit. It also visually updates based on
     `has_missions_for_birthday_status` passed from Streamlit.
     """
+    # Streamlit passes arguments to the JavaScript component and receives its return value.
+    # The `default` value is crucial for the very first render before JS sends back data.
     return _my_birthday_input(
         initial_year=initial_year,
         initial_month=initial_month,
@@ -211,7 +281,7 @@ def birthday_input_component(initial_year=2000, initial_month=1, initial_day=1, 
             "year": initial_year,
             "month": initial_month,
             "day": initial_day,
-            "date_str": f"{initial_year:04d}-{initial_month:02d}-{initial_day:02d}", # Provide a default valid string
+            "date_str": f"{initial_year:04d}-{initial_month:02d}-{initial_day:02d}",
             "is_valid": True
         }
     )
@@ -291,7 +361,7 @@ def load_data(data_url):
     df['Day'] = df['Day'].astype(int)
     return df
 
-sp =pd.read_csv(url)
+sp = load_data(url)
 
 
 # --- Birthday input section ---
@@ -313,12 +383,12 @@ component_value = birthday_input_component(
     key="birthday_date_selector"
 )
 
-# Extract values from the component's return
-year_bday = component_value["year"]
-month_bday = component_value["month"]
-day_bday = component_value["day"]
-bday_date_str_from_component = component_value["date_str"]
-bday_is_valid_from_component = component_value["is_valid"]
+# Extract values from the component's return. Use .get() with defaults for safety
+year_bday = component_value.get("year", st.session_state.bday_component_year)
+month_bday = component_value.get("month", st.session_state.bday_component_month)
+day_bday = component_value.get("day", st.session_state.bday_component_day)
+bday_date_str_from_component = component_value.get("date_str", None)
+bday_is_valid_from_component = component_value.get("is_valid", False) 
 
 # Store component values in session state for persistence across reruns
 st.session_state.bday_component_year = year_bday
@@ -327,7 +397,7 @@ st.session_state.bday_component_day = day_bday
 
 
 # --- Data fetching and display logic based on component output ---
-if bday_is_valid_from_component:
+if bday_is_valid_from_component and bday_date_str_from_component: # Ensure date string is also present
     # Only re-fetch if the date has actually changed to avoid unnecessary API calls
     if bday_date_str_from_component != st.session_state.selected_date_str:
         st.session_state.selected_date_str = bday_date_str_from_component
@@ -339,7 +409,7 @@ if bday_is_valid_from_component:
 
         # Fetch NASA APOD image for birthday date
         API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR"
-        nasa_url = f"https://api.nasa.gov/planetary/apod?api_key={API_KEY}&date={st.session_state.selected_date_str}"
+        nasa_url = f"https://api.nasa.gov/planetary/apod?api_key={API_KEY}&date={st.session_state.selected_date_str}" # Corrected NASA API URL
         try:
             response = requests.get(nasa_url).json()
             st.session_state.nasa_image_data = response
@@ -355,7 +425,9 @@ if bday_is_valid_from_component:
             st.markdown(f'<span class="date-status-not-found">😔 No missions on {st.session_state.selected_date_str}.</span>', unsafe_allow_html=True)
 else:
     # If the date from the component is invalid, reset displayed data and show error
-    st.error("Please enter a valid birthday date.")
+    # Only show error/clear if we previously had a valid date or it's a new invalid entry
+    if st.session_state.selected_date_str or (year_bday != st.session_state.bday_component_year or month_bday != st.session_state.bday_component_month or day_bday != st.session_state.bday_component_day):
+        st.error("Please enter a valid birthday date.")
     st.session_state.missions_data = pd.DataFrame()
     st.session_state.nasa_image_data = {}
     st.session_state.selected_date_str = ""
@@ -470,6 +542,6 @@ if st.session_state.nasa_search_submitted:
     st.subheader(f"NASA Image for {st.session_state.separate_nasa_date_str}")
     if "url" in st.session_state.separate_nasa_image_data:
         st.image(st.session_state.separate_nasa_image_data["url"], caption=st.session_state.separate_nasa_image_data.get("title", "NASA APOD Image"))
-        st.write(st.session_state.separate_image_data.get("explanation", ""))
+        st.write(st.session_state.separate_nasa_image_data.get("explanation", ""))
     else:
         st.warning(f"⚠️ No NASA APOD image available for {st.session_state.separate_nasa_date_str}.")
