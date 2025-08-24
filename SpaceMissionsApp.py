@@ -116,32 +116,14 @@ sp=pd.read_csv(url)
 # --- Birthday input section ---
 st.subheader("Enter The Date Of The Mission")
 
-# Define a container for the birthday inputs to apply dynamic CSS
-birthday_inputs_wrapper_id = "birthday-input-wrapper"
-dynamic_class = ""
-if st.session_state.submitted and st.session_state.has_missions_for_birthday is not None:
-    if not st.session_state.has_missions_for_birthday:
-        dynamic_class = "birthday-inputs-faded"
-    else:
-        dynamic_class = "birthday-inputs-normal" # This will ensure it's explicitly white if found
-
-st.markdown(f'<div id="{birthday_inputs_wrapper_id}" class="{dynamic_class}">', unsafe_allow_html=True)
-date_input_cols = st.columns(3)
-with date_input_cols[0]:
-    year_bday = st.number_input("Year:", min_value=1900, max_value=datetime.datetime.now().year, value=2000, key="bday_year_input")
-with date_input_cols[1]:
-    month_bday = st.number_input("Month:", min_value=1, max_value=12, value=1, key="bday_month_input")
-with date_input_cols[2]:
-    day_bday = st.number_input("Day:", min_value=1, max_value=31, value=1, key="bday_day_input")
-st.markdown('</div>', unsafe_allow_html=True) # Close the dynamic div
-
-# Basic date validation for birthday
-bday_date_is_valid = False
-try:
-    datetime.date(year_bday, month_bday, day_bday)
-    bday_date_is_valid = True
-except ValueError:
-    st.error("Please enter a valid birthday date.")
+# New date input using st.date_input
+selected_date = st.date_input(
+    "Select a Date:",
+    datetime.date(2000, 1, 1), # Default date
+    min_value=datetime.date(1900, 1, 1),
+    max_value=datetime.datetime.now().date(),
+    key="bday_date_input"
+)
 
 # Display status after inputs but before the submit button
 if st.session_state.has_missions_for_birthday is not None and st.session_state.submitted:
@@ -153,27 +135,29 @@ if st.session_state.has_missions_for_birthday is not None and st.session_state.s
 
 # Submit button logic for birthday
 if st.button("Submit Birthday", key="submit_birthday_button"):
-    if bday_date_is_valid:
-        st.session_state.submitted = True
-        st.session_state.selected_date_str = f"{year_bday:04d}-{month_bday:02d}-{day_bday:02d}"
+    st.session_state.submitted = True
+    
+    # Extract year, month, and day from the selected_date object
+    year_bday = selected_date.year
+    month_bday = selected_date.month
+    day_bday = selected_date.day
+    
+    st.session_state.selected_date_str = f"{year_bday:04d}-{month_bday:02d}-{day_bday:02d}"
 
-        # Filter missions data
-        filtered_missions = sp[(sp['Year'] == year_bday) & (sp['Month'] == month_bday) & (sp['Day'] == day_bday)]
-        st.session_state.missions_data = filtered_missions
-        st.session_state.has_missions_for_birthday = not filtered_missions.empty # Set status for "fading" effect
+    # Filter missions data
+    filtered_missions = sp[(sp['Year'] == year_bday) & (sp['Month'] == month_bday) & (sp['Day'] == day_bday)]
+    st.session_state.missions_data = filtered_missions
+    st.session_state.has_missions_for_birthday = not filtered_missions.empty # Set status for "fading" effect
 
-        # Fetch NASA APOD image for birthday date
-        API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR" # Ensure this API key is valid
-        nasa_url = f"https://api.nasa.gov/planetary/apod?api_key={API_KEY}&date={st.session_state.selected_date_str}"
-        try:
-            response = requests.get(nasa_url).json()
-            st.session_state.nasa_image_data = response
-        except requests.exceptions.RequestException as e:
-            st.error(f"Error fetching NASA image for birthday: {e}")
-            st.session_state.nasa_image_data = {}
-    else:
-        st.session_state.submitted = False # Do not display results if the date is invalid
-        st.session_state.has_missions_for_birthday = None # Reset status
+    # Fetch NASA APOD image for birthday date
+    API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR" # Ensure this API key is valid
+    nasa_url = f"https://api.nasa.gov/planetary/apod?api_key={API_KEY}&date={st.session_state.selected_date_str}"
+    try:
+        response = requests.get(nasa_url).json()
+        st.session_state.nasa_image_data = response
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching NASA image for birthday: {e}")
+        st.session_state.nasa_image_data = {}
 
 
 # Display Birthday Results (Missions and NASA Image on Birthday) IF submitted
