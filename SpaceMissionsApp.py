@@ -14,7 +14,6 @@ _COMPONENT_HTML = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Birthday Input Component</title>
-    <!-- It's crucial that streamlit-component-lib.js is loaded correctly and early -->
     <script src="https://unpkg.com/streamlit-component-lib@1.0.0/dist/streamlit-component-lib.js"></script>
     <style>
         /* Base styling for the entire body of the component iframe */
@@ -102,14 +101,13 @@ _COMPONENT_HTML = """
         </div>
     </div>
     <script>
-        let Streamlit; // Declare Streamlit globally within the script context
         let root;
         let yearInput;
         let monthInput;
         let dayInput;
-        let isInitialized = false; // Flag to ensure DOM and listeners are set up only once
-        let componentReadySent = false; // Flag to ensure setComponentReady is called once
-
+        let isInitialized = false;
+        let componentReadySent = false;
+        
         // Helper to format date string
         function formatDate(year, month, day) {
             return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -117,6 +115,7 @@ _COMPONENT_HTML = """
 
         // Function to send updated date and validity to Streamlit
         function sendDateToStreamlit() {
+            const Streamlit = window.Streamlit;
             if (!Streamlit) {
                 console.error("sendDateToStreamlit: Streamlit object not available.");
                 return;
@@ -130,11 +129,9 @@ _COMPONENT_HTML = """
             let dateString = null;
 
             try {
-                // Basic check for number inputs not being empty or NaN
                 if (isNaN(year) || isNaN(month) || isNaN(day) || yearInput.value.trim().length === 0 || monthInput.value.trim().length === 0 || dayInput.value.trim().length === 0) {
                     isValid = false;
                 } else {
-                    // Check for valid day of month (e.g., no Feb 30th)
                     const testDate = new Date(year, month - 1, day);
                     if (testDate.getFullYear() !== year || testDate.getMonth() !== month - 1 || testDate.getDate() !== day) {
                         isValid = false;
@@ -151,30 +148,27 @@ _COMPONENT_HTML = """
                 year: year,
                 month: month,
                 day: day,
-                date_str: dateString, // Send null if invalid
+                date_str: dateString,
                 is_valid: isValid
             });
-            Streamlit.setFrameHeight(); // Ensure iframe height is adjusted after sending value
+            Streamlit.setFrameHeight();
         }
 
         // Function to update the component's UI based on arguments from Streamlit
         function updateComponentUI(args) {
             if (!root || !yearInput || !monthInput || !dayInput) {
                 console.warn("updateComponentUI: DOM elements not ready for UI update.");
-                return; // Guard against elements not being ready
+                return;
             }
 
             const { initial_year, initial_month, initial_day, max_year, has_missions_for_birthday_status } = args;
 
-            // Update input values if they are different from what's currently displayed
             if (parseInt(yearInput.value) !== initial_year) yearInput.value = initial_year;
             if (parseInt(monthInput.value) !== initial_month) monthInput.value = initial_month;
             if (parseInt(dayInput.value) !== initial_day) dayInput.value = initial_day;
             
-            // Set max year, important for input validation in browser
             yearInput.max = max_year;
 
-            // Apply styling based on mission status
             if (has_missions_for_birthday_status === true) {
                 root.classList.remove('faded');
                 root.classList.add('normal');
@@ -182,30 +176,26 @@ _COMPONENT_HTML = """
                 root.classList.remove('normal');
                 root.classList.add('faded');
             } else {
-                // Neutral state if status is None (e.g., on initial load or invalid date)
                 root.classList.remove('faded');
                 root.classList.remove('normal');
             }
 
-            if (Streamlit) {
-                Streamlit.setFrameHeight(); // Adjust iframe height to fit content
+            if (window.Streamlit) {
+                window.Streamlit.setFrameHeight();
             }
         }
 
         // This function will be called by Streamlit when it wants to render/rerun the component
         function onStreamlitRerun(event) {
-            Streamlit = window.Streamlit; // Ensure we always have the latest Streamlit object
-
+            const Streamlit = window.Streamlit;
             if (!Streamlit) {
                 console.error("onStreamlitRerun: Streamlit object not available.");
                 return;
             }
 
-            // Get arguments from Python
             const args = event.detail ? event.detail.args : Streamlit.args;
 
             if (!isInitialized) {
-                // Initialize DOM elements and event listeners only once
                 root = document.getElementById("birthday-input-root");
                 yearInput = root.querySelector("#year-input");
                 monthInput = root.querySelector("#month-input");
@@ -223,8 +213,8 @@ _COMPONENT_HTML = """
                 console.log("Component DOM elements and listeners initialized.");
             }
 
-            updateComponentUI(args); // Update UI based on Python arguments
-            sendDateToStreamlit(); // Send current input values back to Python
+            updateComponentUI(args);
+            sendDateToStreamlit();
         }
 
         // --- Main Component Initialization Flow ---
@@ -232,22 +222,17 @@ _COMPONENT_HTML = """
             console.log("DOMContentLoaded fired. Preparing component.");
 
             if (window.Streamlit) {
-                Streamlit = window.Streamlit; // Assign global Streamlit
+                const Streamlit = window.Streamlit;
                 
-                // Attach the Streamlit AFTER_RERUN listener
                 Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, onStreamlitRerun);
                 console.log("Streamlit AFTER_RERUN listener attached.");
                 
-                // Immediately signal Streamlit that the component's iframe is ready.
-                // This is crucial and should happen early in the component's lifecycle.
-                if (!componentReadySent) { // Use componentReadySent flag
+                if (!componentReadySent) {
                     Streamlit.setComponentReady();
                     componentReadySent = true;
                     console.log("Streamlit.setComponentReady() called on DOMContentLoaded.");
                 }
 
-                // Trigger an initial render manually to populate UI with default/initial args
-                // This simulates the first AFTER_RERUN event if Streamlit is already available.
                 onStreamlitRerun({ detail: { args: Streamlit.args } });
             } else {
                 console.error("DOMContentLoaded: Streamlit object not available. Component functionality limited.");
@@ -272,8 +257,6 @@ def birthday_input_component(initial_year=2000, initial_month=1, initial_day=1, 
     and sends changes back to Streamlit. It also visually updates based on
     `has_missions_for_birthday_status` passed from Streamlit.
     """
-    # Streamlit passes arguments to the JavaScript component and receives its return value.
-    # The `default` value is crucial for the very first render before JS sends back data.
     return _my_birthday_input(
         initial_year=initial_year,
         initial_month=initial_month,
