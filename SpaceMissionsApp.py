@@ -108,6 +108,7 @@ _COMPONENT_HTML = """
         let monthInput;
         let dayInput;
         let isInitialized = false; // Flag to ensure DOM and listeners are set up only once
+        let componentReadySent = false; // Flag to ensure setComponentReady is called once
 
         // Helper to format date string
         function formatDate(year, month, day) {
@@ -224,39 +225,29 @@ _COMPONENT_HTML = """
 
             updateComponentUI(args); // Update UI based on Python arguments
             sendDateToStreamlit(); // Send current input values back to Python
-            
-            // Signal readiness only after the first render cycle
-            // This flag ensures setComponentReady is called only once
-            if (!window.componentReadySent) { // Use a global flag to avoid repeated calls across reruns
-                Streamlit.setComponentReady();
-                window.componentReadySent = true;
-                console.log("Streamlit component ready signal sent.");
-            }
         }
 
         // --- Main Component Initialization Flow ---
-        // 1. Wait for the DOM to be fully loaded (ensures elements exist)
         document.addEventListener('DOMContentLoaded', () => {
             console.log("DOMContentLoaded fired. Preparing component.");
 
-            // 2. Attach the Streamlit AFTER_RERUN listener
-            //    This is the primary way Streamlit communicates updates to the component.
             if (window.Streamlit) {
                 Streamlit = window.Streamlit; // Assign global Streamlit
+                
+                // Attach the Streamlit AFTER_RERUN listener
                 Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, onStreamlitRerun);
                 console.log("Streamlit AFTER_RERUN listener attached.");
                 
-                // 3. Immediately signal Streamlit that the component's iframe is ready.
-                //    This is crucial and should happen early in the component's lifecycle.
-                //    Ensure this is only called once.
-                if (!window.componentReadySent) {
+                // Immediately signal Streamlit that the component's iframe is ready.
+                // This is crucial and should happen early in the component's lifecycle.
+                if (!componentReadySent) { // Use componentReadySent flag
                     Streamlit.setComponentReady();
-                    window.componentReadySent = true;
+                    componentReadySent = true;
                     console.log("Streamlit.setComponentReady() called on DOMContentLoaded.");
                 }
 
-                // 4. Trigger an initial render manually to populate UI with default/initial args
-                //    This simulates the first AFTER_RERUN event.
+                // Trigger an initial render manually to populate UI with default/initial args
+                // This simulates the first AFTER_RERUN event if Streamlit is already available.
                 onStreamlitRerun({ detail: { args: Streamlit.args } });
             } else {
                 console.error("DOMContentLoaded: Streamlit object not available. Component functionality limited.");
