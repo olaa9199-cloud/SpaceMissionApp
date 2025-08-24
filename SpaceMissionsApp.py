@@ -77,8 +77,10 @@ if 'separate_nasa_date_str' not in st.session_state:
 url='https://raw.githubusercontent.com/olaa9199-cloud/SpaceMissionApp/refs/heads/main/dataset_from_space.CSV'
 sp=pd.read_csv(url)
 
-# Convert the 'Date' column to datetime
-sp['Date'] = pd.to_datetime(sp['Date'], errors='coerce')
+# Convert the 'Date' column to datetime and then to string for the selectbox
+sp['Date'] = pd.to_datetime(sp['Date'], errors='coerce').dt.strftime('%Y-%m-%d')
+# Get a list of unique, sorted dates to display in the dropdown
+available_dates = sorted(sp['Date'].dropna().unique().tolist())
 
 # --- Wikipedia API Setup ---
 wiki_wiki = wikipediaapi.Wikipedia(
@@ -101,14 +103,27 @@ def get_mission_summary(mission_name, max_chars=500):
 # --- Mission Date input section ---
 st.subheader("Enter The Date Of The Mission")
 
-# Use st.date_input for a calendar interface
-selected_date = st.date_input(
-    "Select a Date:",
-    datetime.date(2000, 1, 1),
-    min_value=datetime.date(1900, 1, 1),
-    max_value=datetime.datetime.now().date(),
-    key="mission_date_select"
-)
+# Use st.text_input to search the dates
+search_term = st.text_input("Search for a date:", "")
+
+# Filter the available dates based on the search term
+filtered_dates = [date for date in available_dates if search_term.lower() in date.lower()]
+
+# Use the filtered list in the selectbox
+if filtered_dates:
+    selected_date_str = st.selectbox(
+        "Select a Date from the Missions Dataset:",
+        options=filtered_dates,
+        key="mission_date_select"
+    )
+else:
+    st.warning("No dates match your search. Showing all dates.")
+    selected_date_str = st.selectbox(
+        "Select a Date from the Missions Dataset:",
+        options=available_dates,
+        key="mission_date_select"
+    )
+
 
 # Display status after inputs but before the submit button
 if st.session_state.has_missions_for_birthday is not None and st.session_state.submitted:
@@ -122,10 +137,10 @@ if st.session_state.has_missions_for_birthday is not None and st.session_state.s
 if st.button("Submit Mission Date", key="submit_mission_button"):
     st.session_state.submitted = True
     
-    st.session_state.selected_date_str = selected_date.strftime('%Y-%m-%d')
+    st.session_state.selected_date_str = selected_date_str
 
-    # Filter missions data using the selected date object
-    filtered_missions = sp[sp['Date'].dt.date == selected_date]
+    # Filter missions data using the full date string
+    filtered_missions = sp[sp['Date'] == selected_date_str]
     st.session_state.missions_data = filtered_missions
     st.session_state.has_missions_for_birthday = not filtered_missions.empty
 
