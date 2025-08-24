@@ -1,0 +1,6 @@
+streamlit
+pandas
+streamlit_folium
+folium
+requests
+wikipedia_api
