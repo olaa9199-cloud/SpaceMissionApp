@@ -247,7 +247,7 @@ _COMPONENT_HTML = """
 _my_birthday_input = components.declare_component(
     "my_birthday_input",
     html=_COMPONENT_HTML,
-    path=None, # Not loading from a file for this example
+    path=None,
 )
 
 # Wrapper function for the custom component to be used in the Streamlit app
@@ -261,10 +261,9 @@ def birthday_input_component(initial_year=2000, initial_month=1, initial_day=1, 
         initial_year=initial_year,
         initial_month=initial_month,
         initial_day=initial_day,
-        max_year=datetime.datetime.now().year, # Pass current year as max to JS
+        max_year=datetime.datetime.now().year,
         has_missions_for_birthday_status=has_missions_for_birthday_status,
         key=key,
-        # Default value returned when the component first renders before JS sends anything
         default={
             "year": initial_year,
             "month": initial_month,
