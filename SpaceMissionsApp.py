@@ -291,7 +291,7 @@ def load_data(data_url):
     df['Day'] = df['Day'].astype(int)
     return df
 
-sp = load_data(url)
+sp =pd.read_csv(url)
 
 
 # --- Birthday input section ---
