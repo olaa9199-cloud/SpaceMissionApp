@@ -79,7 +79,7 @@ if 'separate_nasa_date_str' not in st.session_state:
 # Or if it's already in the session scope (e.g., loaded outside this function), use it directly.
 # Here's a simple example for 'sp' to ensure the code is runnable independently
 url='https://raw.githubusercontent.com/olaa9199-cloud/SpaceMissionApp/refs/heads/main/dataset_from_space.CSV'
-sp = pd.DataFrame(url)
+sp=pd.read_csv(url)
    
 # Birthday input section
 st.subheader("🎂 Enter your birthday")
