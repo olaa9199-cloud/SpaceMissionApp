@@ -192,11 +192,11 @@ _COMPONENT_HTML = """
         }
 
         // This function will be called by Streamlit when it wants to render/rerun the component
-        function renderStreamlitComponent(event) {
+        function onStreamlitRerun(event) {
             Streamlit = window.Streamlit; // Ensure we always have the latest Streamlit object
 
             if (!Streamlit) {
-                console.error("renderStreamlitComponent: Streamlit object not available.");
+                console.error("onStreamlitRerun: Streamlit object not available.");
                 return;
             }
 
@@ -211,7 +211,7 @@ _COMPONENT_HTML = """
                 dayInput = root.querySelector("#day-input");
 
                 if (!root || !yearInput || !monthInput || !dayInput) {
-                    console.error("renderStreamlitComponent: DOM elements not found during initialization.");
+                    console.error("onStreamlitRerun: DOM elements not found during initialization.");
                     return;
                 }
 
@@ -219,31 +219,47 @@ _COMPONENT_HTML = """
                 monthInput.addEventListener('input', sendDateToStreamlit);
                 dayInput.addEventListener('input', sendDateToStreamlit);
                 isInitialized = true;
+                console.log("Component DOM elements and listeners initialized.");
             }
 
             updateComponentUI(args); // Update UI based on Python arguments
             sendDateToStreamlit(); // Send current input values back to Python
             
             // Signal readiness only after the first render cycle
-            if (!componentReadySent) {
+            // This flag ensures setComponentReady is called only once
+            if (!window.componentReadySent) { // Use a global flag to avoid repeated calls across reruns
                 Streamlit.setComponentReady();
-                componentReadySent = true;
+                window.componentReadySent = true;
                 console.log("Streamlit component ready signal sent.");
             }
         }
 
-        // Main entry point for the component. Listen for Streamlit's render event.
-        // This is the most reliable way for components to interact with Streamlit's rendering.
-        // We use window.addEventListener('load') as a robust starting point for SCL.
-        window.addEventListener('load', () => {
-            console.log("Window loaded. Checking for Streamlit.");
+        // --- Main Component Initialization Flow ---
+        // 1. Wait for the DOM to be fully loaded (ensures elements exist)
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOMContentLoaded fired. Preparing component.");
+
+            // 2. Attach the Streamlit AFTER_RERUN listener
+            //    This is the primary way Streamlit communicates updates to the component.
             if (window.Streamlit) {
-                Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, renderStreamlitComponent);
-                console.log("Streamlit AFTER_RERUN listener added.");
-                // Manually trigger render for the initial load if Streamlit is already there
-                renderStreamlitComponent({ detail: { args: Streamlit.args } });
+                Streamlit = window.Streamlit; // Assign global Streamlit
+                Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, onStreamlitRerun);
+                console.log("Streamlit AFTER_RERUN listener attached.");
+                
+                // 3. Immediately signal Streamlit that the component's iframe is ready.
+                //    This is crucial and should happen early in the component's lifecycle.
+                //    Ensure this is only called once.
+                if (!window.componentReadySent) {
+                    Streamlit.setComponentReady();
+                    window.componentReadySent = true;
+                    console.log("Streamlit.setComponentReady() called on DOMContentLoaded.");
+                }
+
+                // 4. Trigger an initial render manually to populate UI with default/initial args
+                //    This simulates the first AFTER_RERUN event.
+                onStreamlitRerun({ detail: { args: Streamlit.args } });
             } else {
-                console.error("Streamlit object not available even after window load in component.");
+                console.error("DOMContentLoaded: Streamlit object not available. Component functionality limited.");
             }
         });
     </script>
