@@ -102,14 +102,12 @@ _COMPONENT_HTML = """
         </div>
     </div>
     <script>
-        // Ensure Streamlit object is available. It's usually globally available
-        // after streamlit-component-lib.js loads.
         let Streamlit; // Declare Streamlit globally within the script context
         let root;
         let yearInput;
         let monthInput;
         let dayInput;
-        let componentReadySent = false; // Flag to ensure setComponentReady is called once
+        let isInitialized = false; // Flag to ensure DOM and listeners are set up only once
 
         // Helper to format date string
         function formatDate(year, month, day) {
@@ -119,7 +117,7 @@ _COMPONENT_HTML = """
         // Function to send updated date and validity to Streamlit
         function sendDateToStreamlit() {
             if (!Streamlit) {
-                console.error("Streamlit object not available when trying to send date.");
+                console.error("sendDateToStreamlit: Streamlit object not available.");
                 return;
             }
 
@@ -145,7 +143,7 @@ _COMPONENT_HTML = """
                 }
             } catch (e) {
                 isValid = false;
-                console.error("Date parsing error in component:", e);
+                console.error("sendDateToStreamlit: Date parsing error in component:", e);
             }
 
             Streamlit.setComponentValue({
@@ -161,14 +159,13 @@ _COMPONENT_HTML = """
         // Function to update the component's UI based on arguments from Streamlit
         function updateComponentUI(args) {
             if (!root || !yearInput || !monthInput || !dayInput) {
-                console.warn("DOM elements not ready for UI update.");
+                console.warn("updateComponentUI: DOM elements not ready for UI update.");
                 return; // Guard against elements not being ready
             }
 
             const { initial_year, initial_month, initial_day, max_year, has_missions_for_birthday_status } = args;
 
             // Update input values if they are different from what's currently displayed
-            // This ensures Streamlit can "reset" or sync the component if needed
             if (parseInt(yearInput.value) !== initial_year) yearInput.value = initial_year;
             if (parseInt(monthInput.value) !== initial_month) monthInput.value = initial_month;
             if (parseInt(dayInput.value) !== initial_day) dayInput.value = initial_day;
@@ -199,55 +196,56 @@ _COMPONENT_HTML = """
             Streamlit = window.Streamlit; // Ensure we always have the latest Streamlit object
 
             if (!Streamlit) {
-                console.error("Streamlit object not available during renderStreamlitComponent.");
+                console.error("renderStreamlitComponent: Streamlit object not available.");
                 return;
             }
 
             // Get arguments from Python
-            const args = event.detail ? event.detail.args : Streamlit.args; // For first render, Streamlit.args is used
+            const args = event.detail ? event.detail.args : Streamlit.args;
 
-            // Initialize DOM elements and event listeners only once
-            if (!root) { 
+            if (!isInitialized) {
+                // Initialize DOM elements and event listeners only once
                 root = document.getElementById("birthday-input-root");
                 yearInput = root.querySelector("#year-input");
                 monthInput = root.querySelector("#month-input");
                 dayInput = root.querySelector("#day-input");
 
+                if (!root || !yearInput || !monthInput || !dayInput) {
+                    console.error("renderStreamlitComponent: DOM elements not found during initialization.");
+                    return;
+                }
+
                 yearInput.addEventListener('input', sendDateToStreamlit);
                 monthInput.addEventListener('input', sendDateToStreamlit);
                 dayInput.addEventListener('input', sendDateToStreamlit);
+                isInitialized = true;
             }
 
             updateComponentUI(args); // Update UI based on Python arguments
             sendDateToStreamlit(); // Send current input values back to Python
-            Streamlit.setFrameHeight(); // Adjust frame height
-
+            
             // Signal readiness only after the first render cycle
-            // This is a common pattern to avoid "TypeError" before component is fully set up
             if (!componentReadySent) {
                 Streamlit.setComponentReady();
                 componentReadySent = true;
+                console.log("Streamlit component ready signal sent.");
             }
         }
 
         // Main entry point for the component. Listen for Streamlit's render event.
-        // This is generally more reliable than window.onload or DOMContentLoaded for components.
-        // Check if Streamlit is already available (e.g., if script loads after SCL)
-        if (window.Streamlit) {
-            Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, renderStreamlitComponent);
-            // Manually trigger render for the initial load if Streamlit is already there
-            renderStreamlitComponent({ detail: { args: Streamlit.args } });
-        } else {
-            // Fallback if Streamlit is not immediately available, wait for window load
-            window.addEventListener('load', () => {
-                if (window.Streamlit) {
-                    Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, renderStreamlitComponent);
-                    renderStreamlitComponent({ detail: { args: Streamlit.args } });
-                } else {
-                    console.error("Streamlit object not available even after window load.");
-                }
-            });
-        }
+        // This is the most reliable way for components to interact with Streamlit's rendering.
+        // We use window.addEventListener('load') as a robust starting point for SCL.
+        window.addEventListener('load', () => {
+            console.log("Window loaded. Checking for Streamlit.");
+            if (window.Streamlit) {
+                Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, renderStreamlitComponent);
+                console.log("Streamlit AFTER_RERUN listener added.");
+                // Manually trigger render for the initial load if Streamlit is already there
+                renderStreamlitComponent({ detail: { args: Streamlit.args } });
+            } else {
+                console.error("Streamlit object not available even after window load in component.");
+            }
+        });
     </script>
 </body>
 </html>
@@ -409,7 +407,7 @@ if bday_is_valid_from_component and bday_date_str_from_component: # Ensure date 
 
         # Fetch NASA APOD image for birthday date
         API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR"
-        nasa_url = f"https://api.nasa.gov/planetary/apod?api_key={API_KEY}&date={st.session_state.selected_date_str}" # Corrected NASA API URL
+        nasa_url = f"https://api.nasa.gov/planetary/apod?api_key={API_KEY}&date={st.session_state.selected_date_str}"
         try:
             response = requests.get(nasa_url).json()
             st.session_state.nasa_image_data = response
@@ -425,7 +423,6 @@ if bday_is_valid_from_component and bday_date_str_from_component: # Ensure date 
             st.markdown(f'<span class="date-status-not-found">😔 No missions on {st.session_state.selected_date_str}.</span>', unsafe_allow_html=True)
 else:
     # If the date from the component is invalid, reset displayed data and show error
-    # Only show error/clear if we previously had a valid date or it's a new invalid entry
     if st.session_state.selected_date_str or (year_bday != st.session_state.bday_component_year or month_bday != st.session_state.bday_component_month or day_bday != st.session_state.bday_component_day):
         st.error("Please enter a valid birthday date.")
     st.session_state.missions_data = pd.DataFrame()
