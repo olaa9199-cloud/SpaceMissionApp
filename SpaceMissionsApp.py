@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 import folium
 from streamlit_folium import st_folium
-import datetime # Import for date validation
+import datetime
 
 # Ensure the app uses the wide layout
 st.set_page_config(layout="wide")
@@ -84,7 +84,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Initialize session state variables if they don't exist
-# These variables will save the application's state between reruns
 if 'submitted' not in st.session_state:
     st.session_state.submitted = False
 if 'missions_data' not in st.session_state:
@@ -93,8 +92,8 @@ if 'nasa_image_data' not in st.session_state:
     st.session_state.nasa_image_data = {}
 if 'selected_date_str' not in st.session_state:
     st.session_state.selected_date_str = ""
-if 'has_missions_for_birthday' not in st.session_state: # State for fading effect
-    st.session_state.has_missions_for_birthday = None # None (initial), True, or False
+if 'has_missions_for_birthday' not in st.session_state:
+    st.session_state.has_missions_for_birthday = None
 
 # New session state variables for separate NASA APOD search
 if 'nasa_search_submitted' not in st.session_state:
@@ -105,24 +104,24 @@ if 'separate_nasa_date_str' not in st.session_state:
     st.session_state.separate_nasa_date_str = ""
 
 
-# Assume your 'sp' DataFrame is available here
-# For demonstration, I'll use a placeholder. In your actual code, 'sp' should be loaded.
-# Example: sp = pd.read_csv('your_space_missions_data.csv')
-# Or if it's already in the session scope (e.g., loaded outside this function), use it directly.
-# Here's a simple example for 'sp' to ensure the code is runnable independently
+# Load the data once
 url='https://raw.githubusercontent.com/olaa9199-cloud/SpaceMissionApp/refs/heads/main/dataset_from_space.CSV'
 sp=pd.read_csv(url)
+
+# Convert the 'Date' column to datetime and then to string for the selectbox
+# Also, handle potential errors
+sp['Date'] = pd.to_datetime(sp['Date'], errors='coerce').dt.strftime('%Y-%m-%d')
+# Get a list of unique, sorted dates to display in the dropdown
+available_dates = sorted(sp['Date'].dropna().unique().tolist())
 
 # --- Birthday input section ---
 st.subheader("Enter The Date Of The Mission")
 
-# New date input using st.date_input
-selected_date = st.date_input(
-    "Select a Date:",
-    datetime.date(2000, 1, 1), # Default date
-    min_value=datetime.date(1900, 1, 1),
-    max_value=datetime.datetime.now().date(),
-    key="bday_date_input"
+# Use a selectbox to show only dates from the dataset
+selected_date_str = st.selectbox(
+    "Select a Date from the Missions Dataset:",
+    options=available_dates,
+    key="mission_date_select"
 )
 
 # Display status after inputs but before the submit button
@@ -134,41 +133,25 @@ if st.session_state.has_missions_for_birthday is not None and st.session_state.s
 
 
 # Submit button logic for birthday
-if st.button("Submit Birthday", key="submit_birthday_button"):
+if st.button("Submit Mission Date", key="submit_birthday_button"):
     st.session_state.submitted = True
     
-    # Extract year, month, and day from the selected_date object
-    year_bday = selected_date.year
-    month_bday = selected_date.month
-    day_bday = selected_date.day
-    
-    st.session_state.selected_date_str = f"{year_bday:04d}-{month_bday:02d}-{day_bday:02d}"
+    st.session_state.selected_date_str = selected_date_str
 
-    # Filter missions data
-    filtered_missions = sp[(sp['Year'] == year_bday) & (sp['Month'] == month_bday) & (sp['Day'] == day_bday)]
+    # Filter missions data using the full date string
+    filtered_missions = sp[sp['Date'] == selected_date_str]
     st.session_state.missions_data = filtered_missions
-    st.session_state.has_missions_for_birthday = not filtered_missions.empty # Set status for "fading" effect
-
-    # Fetch NASA APOD image for birthday date
-    API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR" # Ensure this API key is valid
-    nasa_url = f"https://api.nasa.gov/planetary/apod?api_key={API_KEY}&date={st.session_state.selected_date_str}"
-    try:
-        response = requests.get(nasa_url).json()
-        st.session_state.nasa_image_data = response
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching NASA image for birthday: {e}")
-        st.session_state.nasa_image_data = {}
+    st.session_state.has_missions_for_birthday = not filtered_missions.empty
 
 
 # Display Birthday Results (Missions and NASA Image on Birthday) IF submitted
 if st.session_state.submitted:
-    st.markdown("---") # Separator for better readability
+    st.markdown("---")
 
-    # Layout: two columns for birthday missions/image and map
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        st.subheader(f"🚀 Missions on your Birthday ({st.session_state.selected_date_str})")
+        st.subheader(f"🚀 Missions on {st.session_state.selected_date_str}")
 
         if not st.session_state.missions_data.empty:
             for _, row in st.session_state.missions_data.iterrows():
@@ -181,14 +164,6 @@ if st.session_state.submitted:
         else:
             st.warning("⚠️ No mission found on this date.")
 
-        # --- Hubble / NASA Image on Birthday ---
-        st.subheader("🌌 Hubble/NASA Image on your Birthday")
-        if "url" in st.session_state.nasa_image_data:
-            st.image(st.session_state.nasa_image_data["url"], caption=st.session_state.nasa_image_data.get("title", "Hubble Image"))
-            st.write(st.session_state.nasa_image_data.get("explanation", ""))
-        else:
-            st.warning("⚠️ No image available for this date.")
-
     with col2:
         st.subheader("🗺️ Launch Locations")
 
@@ -196,21 +171,15 @@ if st.session_state.submitted:
            "latitude" in st.session_state.missions_data.columns and \
            "longitude" in st.session_state.missions_data.columns:
 
-            # Create a copy to avoid SettingWithCopyWarning
             map_data = st.session_state.missions_data[['latitude', 'longitude', 'Mission', 'Rocket', 'Location']].copy()
-
-            # Filter out rows with NaN latitude/longitude to prevent map errors
             map_data.dropna(subset=['latitude', 'longitude'], inplace=True)
 
             if not map_data.empty:
-                # First point to zoom in
                 first_lat = map_data.iloc[0]["latitude"]
                 first_lon = map_data.iloc[0]["longitude"]
 
-                # Create the map
-                m = folium.Map(location=[first_lat, first_lon], zoom_start=4, tiles="CartoDB dark_matter") # Use darker map tiles
+                m = folium.Map(location=[first_lat, first_lon], zoom_start=4, tiles="CartoDB dark_matter")
 
-                # Add markers
                 for _, row in map_data.iterrows():
                     folium.Marker(
                         location=[row["latitude"], row["longitude"]],
@@ -222,17 +191,13 @@ if st.session_state.submitted:
                         icon=folium.Icon(color="red", icon="rocket", prefix="fa")
                     ).add_to(m)
 
-                # Display the map
                 st_folium(m, width=600, height=400)
             else:
                 st.info("No valid mission location data for this date to display on the map.")
         else:
             st.info("No location data available for this date.")
 
-
-# --- Separator ---
 st.markdown("---")
-
 
 # --- Separate NASA APOD search section ---
 st.subheader("🌌 Search NASA Astronomy Picture of the Day (APOD)")
@@ -244,7 +209,6 @@ with nasa_apod_input_cols[1]:
 with nasa_apod_input_cols[2]:
     nasa_day = st.number_input("Day:", min_value=1, max_value=31, value=datetime.datetime.now().day, key="nasa_day_input")
 
-# Basic date validation for NASA APOD
 nasa_apod_date_is_valid = False
 try:
     datetime.date(nasa_year, nasa_month, nasa_day)
@@ -257,8 +221,7 @@ if st.button("Get NASA Image", key="get_nasa_image_button"):
         st.session_state.nasa_search_submitted = True
         st.session_state.separate_nasa_date_str = f"{nasa_year:04d}-{nasa_month:02d}-{nasa_day:02d}"
 
-        # Fetch NASA APOD image for the separate date
-        API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR" # Ensure this API key is valid
+        API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR"
         separate_nasa_url = f"https://api.nasa.gov/planetary/apod?api_key={API_KEY}&date={st.session_state.separate_nasa_date_str}"
         try:
             response = requests.get(separate_nasa_url).json()
@@ -267,10 +230,8 @@ if st.button("Get NASA Image", key="get_nasa_image_button"):
             st.error(f"Error fetching NASA APOD for {st.session_state.separate_nasa_date_str}: {e}")
             st.session_state.separate_nasa_image_data = {}
     else:
-        st.session_state.nasa_search_submitted = False # Do not display results if the date is invalid
+        st.session_state.nasa_search_submitted = False
 
-
-# Display separate NASA APOD results IF submitted
 if st.session_state.nasa_search_submitted:
     st.markdown("---")
     st.subheader(f"NASA Image for {st.session_state.separate_nasa_date_str}")
