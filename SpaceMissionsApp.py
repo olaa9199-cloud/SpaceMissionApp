@@ -143,7 +143,8 @@ _COMPONENT_HTML = """
                 isValid = false;
                 console.error("sendDateToStreamlit: Date parsing error in component:", e);
             }
-
+            
+            // This is the key fix. The component value is set outside the try-catch block.
             Streamlit.setComponentValue({
                 year: year,
                 month: month,
