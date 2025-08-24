@@ -195,36 +195,29 @@ st.markdown("---")
 
 # --- Separate NASA APOD search section ---
 st.subheader("🌌 Search NASA Astronomy Picture of the Day (APOD)")
-nasa_apod_input_cols = st.columns(3)
-with nasa_apod_input_cols[0]:
-    nasa_year = st.number_input("Year:", min_value=1995, max_value=datetime.datetime.now().year, value=datetime.datetime.now().year, key="nasa_year_input")
-with nasa_apod_input_cols[1]:
-    nasa_month = st.number_input("Month:", min_value=1, max_value=12, value=datetime.datetime.now().month, key="nasa_month_input")
-with nasa_apod_input_cols[2]:
-    nasa_day = st.number_input("Day:", min_value=1, max_value=31, value=datetime.datetime.now().day, key="nasa_day_input")
 
-nasa_apod_date_is_valid = False
-try:
-    datetime.date(nasa_year, nasa_month, nasa_day)
-    nasa_apod_date_is_valid = True
-except ValueError:
-    st.error("Please enter a valid date for NASA APOD search.")
+# Use st.date_input to select the NASA APOD date
+nasa_apod_date = st.date_input(
+    "Select a Date for NASA APOD:",
+    datetime.datetime.now().date(),
+    min_value=datetime.date(1995, 6, 16),
+    max_value=datetime.datetime.now().date(),
+    key="nasa_date_select"
+)
 
 if st.button("Get NASA Image", key="get_nasa_image_button"):
-    if nasa_apod_date_is_valid:
-        st.session_state.nasa_search_submitted = True
-        st.session_state.separate_nasa_date_str = f"{nasa_year:04d}-{nasa_month:02d}-{nasa_day:02d}"
+    st.session_state.nasa_search_submitted = True
+    st.session_state.separate_nasa_date_str = nasa_apod_date.strftime('%Y-%m-%d')
 
-        API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR"
-        separate_nasa_url = f"https://api.nasa.gov/planetary/apod?api_key={API_KEY}&date={st.session_state.separate_nasa_date_str}"
-        try:
-            response = requests.get(separate_nasa_url).json()
-            st.session_state.separate_nasa_image_data = response
-        except requests.exceptions.RequestException as e:
-            st.error(f"Error fetching NASA APOD for {st.session_state.separate_nasa_date_str}: {e}")
-            st.session_state.separate_nasa_image_data = {}
-    else:
-        st.session_state.nasa_search_submitted = False
+    API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR"
+    separate_nasa_url = f"https://api.nasa.gov/planetary/apod?api_key={API_KEY}&date={st.session_state.separate_nasa_date_str}"
+    try:
+        response = requests.get(separate_nasa_url).json()
+        st.session_state.separate_nasa_image_data = response
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching NASA APOD for {st.session_state.separate_nasa_date_str}: {e}")
+        st.session_state.separate_nasa_image_data = {}
+
 
 if st.session_state.nasa_search_submitted:
     st.markdown("---")
