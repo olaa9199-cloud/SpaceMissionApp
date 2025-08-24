@@ -3,5 +3,6 @@ pandas
 streamlit_folium
 folium
 requests
-streamlit.components.v1
+
 wikipedia_api
+
