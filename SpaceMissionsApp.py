@@ -3,14 +3,216 @@ import pandas as pd
 import requests
 import folium
 from streamlit_folium import st_folium
-import datetime # Import for date validation
+import datetime
+import streamlit.components.v1 as components
 
-# Ensure the app uses the wide layout
+# --- Custom Component for Birthday Input ---
+# This HTML and JavaScript will render the custom date input fields and handle their styling
+_COMPONENT_HTML = """
+<script src="https://unpkg.com/streamlit-component-lib@1.0.0/dist/streamlit-component-lib.js"></script>
+<style>
+    /* Styling for the overall container of the custom date inputs */
+    .date-input-container-wrapper {
+        display: flex;
+        flex-direction: column; /* Stack year, month, day vertically in their own lines */
+        gap: 10px; /* Space between each input row */
+        margin-bottom: 10px;
+    }
+    /* Styling for each individual date input row (label + input) */
+    .date-input-row {
+        display: flex;
+        align-items: center;
+        gap: 10px; /* Space between label and input */
+    }
+    .date-input-row label {
+        color: white;
+        font-weight: bold;
+        min-width: 60px; /* Ensure labels align */
+        text-align: right;
+    }
+    .date-input-row input[type="number"] {
+        flex-grow: 1; /* Allow input to take available space */
+        max-width: 120px; /* Limit max width for a cleaner look */
+        padding: 8px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        background-color: black; /* Dark theme */
+        color: white; /* White text */
+        font-size: 1em;
+        transition: border-color 0.3s ease, color 0.3s ease, background-color 0.3s ease;
+        -moz-appearance: textfield; /* Hide Firefox number input arrows */
+    }
+    /* Hide Chrome/Safari number input arrows */
+    .date-input-row input[type="number"]::-webkit-outer-spin-button,
+    .date-input-row input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    .date-input-row input[type="number"]:focus {
+        outline: none;
+        border-color: #4CAF50;
+    }
+
+    /* Styles for when no missions are found (faded state) */
+    .date-input-container-wrapper.faded .date-input-row input[type="number"],
+    .date-input-container-wrapper.faded .date-input-row label {
+        color: #888 !important;
+        background-color: #333 !important;
+        border-color: #555 !important;
+    }
+    .date-input-container-wrapper.faded .date-input-row input[type="number"]:focus {
+        border-color: #888;
+    }
+    /* Styles for when missions are found (normal state) */
+    .date-input-container-wrapper.normal .date-input-row input[type="number"],
+    .date-input-container-wrapper.normal .date-input-row label {
+        color: white !important;
+        background-color: black !important;
+        border-color: white !important;
+    }
+</style>
+<div id="birthday-input-root" class="date-input-container-wrapper">
+    <div class="date-input-row">
+        <label for="year-input">Year:</label>
+        <input type="number" id="year-input" min="1900" max="{max_year}" value="{initial_year}">
+    </div>
+    <div class="date-input-row">
+        <label for="month-input">Month:</label>
+        <input type="number" id="month-input" min="1" max="12" value="{initial_month}">
+    </div>
+    <div class="date-input-row">
+        <label for="day-input">Day:</label>
+        <input type="number" id="day-input" min="1" max="31" value="{initial_day}">
+    </div>
+</div>
+<script>
+    const Streamlit = window.Streamlit;
+    const root = document.getElementById("birthday-input-root");
+    const yearInput = root.querySelector("#year-input");
+    const monthInput = root.querySelector("#month-input");
+    const dayInput = root.querySelector("#day-input");
+
+    // Helper to format date string
+    function formatDate(year, month, day) {
+        return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+
+    // Function to send updated date and validity to Streamlit
+    function sendDateToStreamlit() {
+        const year = parseInt(yearInput.value);
+        const month = parseInt(monthInput.value);
+        const day = parseInt(dayInput.value);
+
+        let isValid = true;
+        let dateString = null;
+
+        try {
+            // Check for valid day of month (e.g., no Feb 30th)
+            const testDate = new Date(year, month - 1, day);
+            if (testDate.getFullYear() !== year || testDate.getMonth() !== month - 1 || testDate.getDate() !== day) {
+                isValid = false;
+            } else {
+                 dateString = formatDate(year, month, day);
+            }
+        } catch (e) {
+            isValid = false;
+        }
+
+        // Also check if year, month, day inputs are empty or clearly invalid numbers
+        if (isNaN(year) || isNaN(month) || isNaN(day) || yearInput.value.length === 0 || monthInput.value.length === 0 || dayInput.value.length === 0) {
+            isValid = false;
+            dateString = null; // No valid date string if inputs are incomplete/invalid
+        }
+
+        Streamlit.setComponentValue({
+            year: year,
+            month: month,
+            day: day,
+            date_str: dateString, // Send null if invalid
+            is_valid: isValid
+        });
+    }
+
+    // Function to update the component's UI based on arguments from Streamlit
+    function updateComponent(args) {
+        const { initial_year, initial_month, initial_day, max_year, has_missions_for_birthday_status } = args;
+
+        // Update input values if they are different from what's currently displayed
+        // This ensures Streamlit can "reset" or sync the component if needed
+        if (parseInt(yearInput.value) !== initial_year) yearInput.value = initial_year;
+        if (parseInt(monthInput.value) !== initial_month) monthInput.value = initial_month;
+        if (parseInt(dayInput.value) !== initial_day) dayInput.value = initial_day;
+        
+        yearInput.max = max_year;
+
+        // Apply styling based on mission status
+        if (has_missions_for_birthday_status === true) {
+            root.classList.remove('faded');
+            root.classList.add('normal');
+        } else if (has_missions_for_birthday_status === false) {
+            root.classList.remove('normal');
+            root.classList.add('faded');
+        } else {
+            // Neutral state if status is None (e.g., on initial load or invalid date)
+            root.classList.remove('faded');
+            root.classList.remove('normal');
+        }
+
+        Streamlit.setFrameHeight(); // Adjust iframe height to fit content
+    }
+
+    // Add event listeners to input fields
+    yearInput.addEventListener('input', sendDateToStreamlit);
+    monthInput.addEventListener('input', sendDateToStreamlit);
+    dayInput.addEventListener('input', sendDateToStreamlit);
+
+    // Register event listener for Streamlit component updates
+    Streamlit.events.addEventListener(Streamlit.LIFECYCLE.AFTER_RERUN, updateComponent);
+
+    // Initial call to updateComponent and send initial state to Streamlit
+    updateComponent(Streamlit.args);
+    sendDateToStreamlit(); // Send initial values to Python
+</script>
+"""
+
+# Create a Streamlit component function
+# The `html` argument directly embeds the HTML/JS.
+_my_birthday_input = components.declare_component(
+    "my_birthday_input",
+    html=_COMPONENT_HTML,
+    path=None, # Not loading from a file for this example
+)
+
+# Wrapper function for the custom component to be used in the Streamlit app
+def birthday_input_component(initial_year=2000, initial_month=1, initial_day=1, has_missions_for_birthday_status=None, key=None):
+    """
+    A Streamlit component that provides date input fields (Year, Month, Day)
+    and sends changes back to Streamlit. It also visually updates based on
+    `has_missions_for_birthday_status` passed from Streamlit.
+    """
+    # Streamlit passes arguments to the JavaScript component and receives its return value.
+    return _my_birthday_input(
+        initial_year=initial_year,
+        initial_month=initial_month,
+        initial_day=initial_day,
+        max_year=datetime.datetime.now().year, # Pass current year as max to JS
+        has_missions_for_birthday_status=has_missions_for_birthday_status,
+        key=key,
+        # Default value returned when the component first renders before JS sends anything
+        default={
+            "year": initial_year,
+            "month": initial_month,
+            "day": initial_day,
+            "date_str": f"{initial_year:04d}-{initial_month:02d}-{initial_day:02d}",
+            "is_valid": True
+        }
+    )
+
+# --- Main Streamlit App Configuration ---
 st.set_page_config(layout="wide")
-
 st.title("🚀 Space Missions & Hubble Image")
 
-# CSS for dark theme and white text
+# General CSS for dark theme and white text (still applies to other Streamlit widgets)
 st.markdown("""
     <style>
     .stApp {
@@ -20,7 +222,7 @@ st.markdown("""
     .block-container {
         text-align: left;
     }
-    h1, h2, h3, h4, h5, h6, label, p, .stMarkdown, .css-1lcbmhc, .stNumberInput {
+    h1, h2, h3, h4, h5, h6, label, p, .stMarkdown {
         color: white !important;
     }
     /* Specific styling for the submit button */
@@ -42,61 +244,28 @@ st.markdown("""
         color: #4CAF50; /* Green */
         font-weight: bold;
         padding-left: 10px;
-        font-size: 1.1em; /* Make it slightly larger */
+        font-size: 1.1em;
     }
     .date-status-not-found {
         color: #888; /* Grey */
         font-weight: bold;
         padding-left: 10px;
-        font-size: 1.1em; /* Make it slightly larger */
+        font-size: 1.1em;
     }
-
-    /* CSS for the 'ghost text' effect on birthday inputs */
-    /* When no missions are found for the submitted date */
-    .birthday-inputs-faded .stNumberInput > label {
-        color: #888 !important; /* Grey out the label */
-    }
-    .birthday-inputs-faded .stNumberInput input { /* Targeting the input element directly */
-        color: #888 !important; /* Grey out the input text */
-        background-color: #333 !important; /* Slightly darker background to show fading */
-        border-color: #555 !important;
-    }
-    .birthday-inputs-faded .stNumberInput button { /* Grey out +/- buttons */
-        color: #888 !important;
-        border-color: #555 !important;
-    }
-
-    /* When missions ARE found for the submitted date, ensure they are clearly white */
-    .birthday-inputs-normal .stNumberInput > label {
-        color: white !important;
-    }
-    .birthday-inputs-normal .stNumberInput input {
-        color: white !important;
-        background-color: black !important;
-        border-color: white !important;
-    }
-    .birthday-inputs-normal .stNumberInput button {
-        color: white !important;
-        border-color: white !important;
-    }
-
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state variables if they don't exist
-# These variables will save the application's state between reruns
-if 'submitted' not in st.session_state:
-    st.session_state.submitted = False
+# Initialize session state variables
 if 'missions_data' not in st.session_state:
     st.session_state.missions_data = pd.DataFrame()
 if 'nasa_image_data' not in st.session_state:
     st.session_state.nasa_image_data = {}
 if 'selected_date_str' not in st.session_state:
     st.session_state.selected_date_str = ""
-if 'has_missions_for_birthday' not in st.session_state: # State for fading effect
-    st.session_state.has_missions_for_birthday = None # None (initial), True, or False
+if 'has_missions_for_birthday' not in st.session_state:
+    st.session_state.has_missions_for_birthday = None
 
-# New session state variables for separate NASA APOD search
+# For separate NASA APOD search
 if 'nasa_search_submitted' not in st.session_state:
     st.session_state.nasa_search_submitted = False
 if 'separate_nasa_image_data' not in st.session_state:
@@ -104,67 +273,65 @@ if 'separate_nasa_image_data' not in st.session_state:
 if 'separate_nasa_date_str' not in st.session_state:
     st.session_state.separate_nasa_date_str = ""
 
+# Load the space missions dataset
+url = 'https://raw.githubusercontent.com/olaa9199-cloud/SpaceMissionApp/refs/heads/main/dataset_from_space.CSV'
+@st.cache_data
+def load_data(data_url):
+    df = pd.read_csv(data_url)
+    df['Year'] = df['Year'].astype(int)
+    df['Month'] = df['Month'].astype(int)
+    df['Day'] = df['Day'].astype(int)
+    return df
 
-# Assume your 'sp' DataFrame is available here
-# For demonstration, I'll use a placeholder. In your actual code, 'sp' should be loaded.
-# Example: sp = pd.read_csv('your_space_missions_data.csv')
-# Or if it's already in the session scope (e.g., loaded outside this function), use it directly.
-# Here's a simple example for 'sp' to ensure the code is runnable independently
-url='https://raw.githubusercontent.com/olaa9199-cloud/SpaceMissionApp/refs/heads/main/dataset_from_space.CSV'
-sp=pd.read_csv(url)
+sp = load_data(url)
 
 
 # --- Birthday input section ---
 st.subheader("🎂 Enter your birthday")
 
-# Define a container for the birthday inputs to apply dynamic CSS
-birthday_inputs_wrapper_id = "birthday-input-wrapper"
-dynamic_class = ""
-if st.session_state.submitted and st.session_state.has_missions_for_birthday is not None:
-    if not st.session_state.has_missions_for_birthday:
-        dynamic_class = "birthday-inputs-faded"
-    else:
-        dynamic_class = "birthday-inputs-normal" # This will ensure it's explicitly white if found
+# Initialize default values for the custom component if not in session state
+if 'bday_component_year' not in st.session_state:
+    st.session_state.bday_component_year = 2000
+    st.session_state.bday_component_month = 1
+    st.session_state.bday_component_day = 1
 
-st.markdown(f'<div id="{birthday_inputs_wrapper_id}" class="{dynamic_class}">', unsafe_allow_html=True)
-date_input_cols = st.columns(3)
-with date_input_cols[0]:
-    year_bday = st.number_input("Year:", min_value=1900, max_value=datetime.datetime.now().year, value=2000, key="bday_year_input")
-with date_input_cols[1]:
-    month_bday = st.number_input("Month:", min_value=1, max_value=12, value=1, key="bday_month_input")
-with date_input_cols[2]:
-    day_bday = st.number_input("Day:", min_value=1, max_value=31, value=1, key="bday_day_input")
-st.markdown('</div>', unsafe_allow_html=True) # Close the dynamic div
+# Render the custom birthday input component
+component_value = birthday_input_component(
+    initial_year=st.session_state.bday_component_year,
+    initial_month=st.session_state.bday_component_month,
+    initial_day=st.session_state.bday_component_day,
+    # Pass the mission status to the component for real-time styling
+    has_missions_for_birthday_status=st.session_state.has_missions_for_birthday,
+    key="birthday_date_selector"
+)
 
-# Basic date validation for birthday
-bday_date_is_valid = False
-try:
-    datetime.date(year_bday, month_bday, day_bday)
-    bday_date_is_valid = True
-except ValueError:
-    st.error("Please enter a valid birthday date.")
+# Extract values from the component's return
+year_bday = component_value["year"]
+month_bday = component_value["month"]
+day_bday = component_value["day"]
+bday_date_str_from_component = component_value["date_str"]
+bday_is_valid_from_component = component_value["is_valid"]
 
-# Display status after inputs but before the submit button
-if st.session_state.has_missions_for_birthday is not None and st.session_state.submitted:
-    if st.session_state.has_missions_for_birthday:
-        st.markdown(f'<span class="date-status-found">🎉 Missions found on {st.session_state.selected_date_str}!</span>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'<span class="date-status-not-found">😔 No missions on {st.session_state.selected_date_str}.</span>', unsafe_allow_html=True)
+# Store component values in session state for persistence across reruns
+st.session_state.bday_component_year = year_bday
+st.session_state.bday_component_month = month_bday
+st.session_state.bday_component_day = day_bday
 
 
-# Submit button logic for birthday
-if st.button("Submit Birthday", key="submit_birthday_button"):
-    if bday_date_is_valid:
-        st.session_state.submitted = True
-        st.session_state.selected_date_str = f"{year_bday:04d}-{month_bday:02d}-{day_bday:02d}"
+# --- Data fetching and display logic based on component output ---
+if bday_is_valid_from_component:
+    # Only re-fetch if the date has actually changed to avoid unnecessary API calls
+    if bday_date_str_from_component != st.session_state.selected_date_str:
+        st.session_state.selected_date_str = bday_date_str_from_component
 
         # Filter missions data
+        # Ensure 'sp' has 'Year', 'Month', 'Day' columns and they are correctly typed
         filtered_missions = sp[(sp['Year'] == year_bday) & (sp['Month'] == month_bday) & (sp['Day'] == day_bday)]
         st.session_state.missions_data = filtered_missions
-        st.session_state.has_missions_for_birthday = not filtered_missions.empty # Set status for "fading" effect
+        st.session_state.has_missions_for_birthday = not filtered_missions.empty
 
         # Fetch NASA APOD image for birthday date
-        API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR" # Ensure this API key is valid
+        API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR"
         nasa_url = f"https://api.nasa.gov/planetary/apod?api_key={API_KEY}&date={st.session_state.selected_date_str}"
         try:
             response = requests.get(nasa_url).json()
@@ -172,16 +339,26 @@ if st.button("Submit Birthday", key="submit_birthday_button"):
         except requests.exceptions.RequestException as e:
             st.error(f"Error fetching NASA image for birthday: {e}")
             st.session_state.nasa_image_data = {}
-    else:
-        st.session_state.submitted = False # Do not display results if the date is invalid
-        st.session_state.has_missions_for_birthday = None # Reset status
+    
+    # Display status after inputs
+    if st.session_state.has_missions_for_birthday is not None:
+        if st.session_state.has_missions_for_birthday:
+            st.markdown(f'<span class="date-status-found">🎉 Missions found on {st.session_state.selected_date_str}!</span>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<span class="date-status-not-found">😔 No missions on {st.session_state.selected_date_str}.</span>', unsafe_allow_html=True)
+else:
+    # If the date from the component is invalid, reset displayed data and show error
+    st.error("Please enter a valid birthday date.")
+    st.session_state.missions_data = pd.DataFrame()
+    st.session_state.nasa_image_data = {}
+    st.session_state.selected_date_str = ""
+    st.session_state.has_missions_for_birthday = None
 
 
-# Display Birthday Results (Missions and NASA Image on Birthday) IF submitted
-if st.session_state.submitted:
+# Display Birthday Results (Missions and NASA Image on Birthday)
+if bday_is_valid_from_component and st.session_state.selected_date_str:
     st.markdown("---") # Separator for better readability
 
-    # Layout: two columns for birthday missions/image and map
     col1, col2 = st.columns([2, 1])
 
     with col1:
@@ -198,7 +375,6 @@ if st.session_state.submitted:
         else:
             st.warning("⚠️ No mission found on this date.")
 
-        # --- Hubble / NASA Image on Birthday ---
         st.subheader("🌌 Hubble/NASA Image on your Birthday")
         if "url" in st.session_state.nasa_image_data:
             st.image(st.session_state.nasa_image_data["url"], caption=st.session_state.nasa_image_data.get("title", "Hubble Image"))
@@ -213,21 +389,15 @@ if st.session_state.submitted:
            "latitude" in st.session_state.missions_data.columns and \
            "longitude" in st.session_state.missions_data.columns:
 
-            # Create a copy to avoid SettingWithCopyWarning
             map_data = st.session_state.missions_data[['latitude', 'longitude', 'Mission', 'Rocket', 'Location']].copy()
-
-            # Filter out rows with NaN latitude/longitude to prevent map errors
             map_data.dropna(subset=['latitude', 'longitude'], inplace=True)
 
             if not map_data.empty:
-                # First point to zoom in
                 first_lat = map_data.iloc[0]["latitude"]
                 first_lon = map_data.iloc[0]["longitude"]
 
-                # Create the map
-                m = folium.Map(location=[first_lat, first_lon], zoom_start=4, tiles="CartoDB dark_matter") # Use darker map tiles
+                m = folium.Map(location=[first_lat, first_lon], zoom_start=4, tiles="CartoDB dark_matter")
 
-                # Add markers
                 for _, row in map_data.iterrows():
                     folium.Marker(
                         location=[row["latitude"], row["longitude"]],
@@ -239,7 +409,6 @@ if st.session_state.submitted:
                         icon=folium.Icon(color="red", icon="rocket", prefix="fa")
                     ).add_to(m)
 
-                # Display the map
                 st_folium(m, width=600, height=400)
             else:
                 st.info("No valid mission location data for this date to display on the map.")
@@ -251,17 +420,20 @@ if st.session_state.submitted:
 st.markdown("---")
 
 
-# --- Separate NASA APOD search section ---
+# --- Separate NASA APOD search section (still using native st.number_input) ---
 st.subheader("🌌 Search NASA Astronomy Picture of the Day (APOD)")
 nasa_apod_input_cols = st.columns(3)
 with nasa_apod_input_cols[0]:
-    nasa_year = st.number_input("Year:", min_value=1995, max_value=datetime.datetime.now().year, value=datetime.datetime.now().year, key="nasa_year_input")
+    nasa_year = st.number_input("Year:", min_value=1995, max_value=datetime.datetime.now().year, value=st.session_state.get('nasa_year', datetime.datetime.now().year), key="nasa_year_input")
 with nasa_apod_input_cols[1]:
-    nasa_month = st.number_input("Month:", min_value=1, max_value=12, value=datetime.datetime.now().month, key="nasa_month_input")
+    nasa_month = st.number_input("Month:", min_value=1, max_value=12, value=st.session_state.get('nasa_month', datetime.datetime.now().month), key="nasa_month_input")
 with nasa_apod_input_cols[2]:
-    nasa_day = st.number_input("Day:", min_value=1, max_value=31, value=datetime.datetime.now().day, key="nasa_day_input")
+    nasa_day = st.number_input("Day:", min_value=1, max_value=31, value=st.session_state.get('nasa_day', datetime.datetime.now().day), key="nasa_day_input")
 
-# Basic date validation for NASA APOD
+st.session_state.nasa_year = nasa_year
+st.session_state.nasa_month = nasa_month
+st.session_state.nasa_day = nasa_day
+
 nasa_apod_date_is_valid = False
 try:
     datetime.date(nasa_year, nasa_month, nasa_day)
@@ -274,8 +446,7 @@ if st.button("Get NASA Image", key="get_nasa_image_button"):
         st.session_state.nasa_search_submitted = True
         st.session_state.separate_nasa_date_str = f"{nasa_year:04d}-{nasa_month:02d}-{nasa_day:02d}"
 
-        # Fetch NASA APOD image for the separate date
-        API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR" # Ensure this API key is valid
+        API_KEY = "yy649GUC0vwwZ2Vxu5DupLUuI9TdigRnBRLSwcHR"
         separate_nasa_url = f"https://api.nasa.gov/planetary/apod?api_key={API_KEY}&date={st.session_state.separate_nasa_date_str}"
         try:
             response = requests.get(separate_nasa_url).json()
@@ -284,10 +455,9 @@ if st.button("Get NASA Image", key="get_nasa_image_button"):
             st.error(f"Error fetching NASA APOD for {st.session_state.separate_nasa_date_str}: {e}")
             st.session_state.separate_nasa_image_data = {}
     else:
-        st.session_state.nasa_search_submitted = False # Do not display results if the date is invalid
+        st.session_state.nasa_search_submitted = False
 
 
-# Display separate NASA APOD results IF submitted
 if st.session_state.nasa_search_submitted:
     st.markdown("---")
     st.subheader(f"NASA Image for {st.session_state.separate_nasa_date_str}")
