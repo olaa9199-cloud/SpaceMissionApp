@@ -4,6 +4,7 @@ import requests
 import folium
 from streamlit_folium import st_folium
 import datetime # Import for date validation
+import wikipediaapi
 wiki_wiki = wikipediaapi.Wikipedia(
     language='en',
     user_agent="SpaceMissionsApp/0.1 (contact: olaa9199@gmail.com)"
