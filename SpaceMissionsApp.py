@@ -110,26 +110,8 @@ if 'separate_nasa_date_str' not in st.session_state:
 # Example: sp = pd.read_csv('your_space_missions_data.csv')
 # Or if it's already in the session scope (e.g., loaded outside this function), use it directly.
 # Here's a simple example for 'sp' to ensure the code is runnable independently
-try:
-    # Attempt to use the existing 'sp' if defined.
-    _ = sp # This will raise NameError if sp is not defined
-except NameError:
-    # Placeholder data - REMOVE THIS BLOCK IF 'sp' IS ALREADY LOADED IN YOUR APP
-    sp_placeholder_data = {
-        'Year': [2000, 2000, 2001, 2001, 2000, 2005],
-        'Month': [1, 1, 2, 3, 5, 8],
-        'Day': [1, 15, 1, 10, 10, 26],
-        'Mission': ['Mars Pathfinder', 'ISS Resupply-1', 'Hubble Servicing-3B', 'Soyuz TM-32', 'STS-101', 'Discovery STS-114'],
-        'MissionStatus': ['Success', 'Success', 'Success', 'Success', 'Success', 'Success'],
-        'Rocket': ['Delta II', 'Soyuz-U', 'Discovery', 'Soyuz-FG', 'Atlantis', 'Discovery'],
-        'Time': ['10:00:00', '15:30:00', '08:00:00', '12:00:00', '06:00:00', '10:39:00'],
-        'Location': ['Cape Canaveral', 'Baikonur Cosmodrome', 'Kennedy Space Center', 'Baikonur Cosmodrome', 'Kennedy Space Center', 'Kennedy Space Center'],
-        'latitude': [28.3922, 45.9653, 28.5623, 45.9653, 28.5623, 28.5623],
-        'longitude': [-80.6077, 63.3052, -80.6489, 63.3052, -80.6489, -80.6489]
-    }
-    sp = pd.DataFrame(sp_placeholder_data)
-    st.info("Note: Placeholder data for 'sp' is being used. Please ensure your actual data is loaded for the app to function correctly.")
-
+url='https://raw.githubusercontent.com/olaa9199-cloud/SpaceMissionApp/refs/heads/main/dataset_from_space.CSV'
+sp=pd.read_csv(url)
 
 # --- Birthday input section ---
 st.subheader("🎂 Enter your birthday")
