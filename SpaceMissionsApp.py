@@ -114,7 +114,7 @@ url='https://raw.githubusercontent.com/olaa9199-cloud/SpaceMissionApp/refs/heads
 sp=pd.read_csv(url)
 
 # --- Birthday input section ---
-st.subheader("🎂 Enter your birthday")
+st.subheader("Enter The Date Of The Mission")
 
 # Define a container for the birthday inputs to apply dynamic CSS
 birthday_inputs_wrapper_id = "birthday-input-wrapper"
