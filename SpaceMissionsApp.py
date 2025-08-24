@@ -52,6 +52,7 @@ st.markdown("""
     }
 
     /* CSS for the 'ghost text' effect on birthday inputs */
+    /* When no missions are found for the submitted date */
     .birthday-inputs-faded .stNumberInput > label {
         color: #888 !important; /* Grey out the label */
     }
@@ -64,7 +65,8 @@ st.markdown("""
         color: #888 !important;
         border-color: #555 !important;
     }
-    /* Ensure normal style for non-faded state */
+
+    /* When missions ARE found for the submitted date, ensure they are clearly white */
     .birthday-inputs-normal .stNumberInput > label {
         color: white !important;
     }
@@ -108,9 +110,9 @@ if 'separate_nasa_date_str' not in st.session_state:
 # Example: sp = pd.read_csv('your_space_missions_data.csv')
 # Or if it's already in the session scope (e.g., loaded outside this function), use it directly.
 # Here's a simple example for 'sp' to ensure the code is runnable independently
-
 url='https://raw.githubusercontent.com/olaa9199-cloud/SpaceMissionApp/refs/heads/main/dataset_from_space.CSV'
 sp=pd.read_csv(url)
+
 
 # --- Birthday input section ---
 st.subheader("🎂 Enter your birthday")
